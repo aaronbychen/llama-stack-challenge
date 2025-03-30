@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+          --primary: #4361ee;
+          --primary-dark: #3a56d4;
+          --secondary: #7209b7;
+          --light: #f8f9fa;
+          --dark: #212529;
+          --success: #2ecc71;
+          --warning: #f39c12;
+          --danger: #e74c3c;
+          --gray-100: #f8f9fa;
+          --gray-200: #e9ecef;
+          --gray-300: #dee2e6;
+        }
+
+        body {
+          background-color: var(--gray-100);
+          color: var(--dark);
+        }
+
+        .card {
+          border: none;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .upload-area {
+          border: 2px dashed var(--gray-300);
+          border-radius: 12px;
+          padding: 40px 20px;
+          text-align: center;
+          background: var(--light);
+          cursor: pointer;
+          margin-bottom: 20px;
+          transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+          border-color: var(--primary);
+          background: rgba(67, 97, 238, 0.05);
+        }
+
+        .upload-icon {
+          color: var(--primary);
+          transition: transform 0.3s ease;
+        }
+
+        .upload-area:hover .upload-icon {
+          transform: translateY(-5px);
+        }
+
+        .frame-card {
+          opacity: 0;
+          transform: translateY(20px);
+          animation: fadeIn 0.5s forwards;
+        }
+
+        @keyframes fadeIn {
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .frame-image {
+          border-radius: 8px;
+          transition: transform 0.3s;
+          cursor: zoom-in;
+        }
+
+        .frame-image:hover {
+          transform: scale(1.02);
+        }
+
+        .match-badge {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          padding: 5px 10px;
+          border-radius: 20px;
+          font-weight: 600;
+        }
+
+        .results-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .analyzing {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="container-fluid py-3 bg-dark text-light mb-4">
+        <div class="container d-flex align-items-center">
+            <h1 class="h4 mb-0">AI Video Scanner</h1>
+            <div class="ms-auto">
+                <span class="badge bg-success">Powered by Llama 3.2</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h3 class="card-title mb-0">Object Detection in Videos</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="uploadForm">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Upload Video</label>
+                                <div class="upload-area" id="uploadArea">
+                                    <div class="upload-icon mb-3">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-cloud-arrow-up" viewBox="0 0 16 16">
+                                            <path fill-rule="evenodd" d="M7.646 5.146a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L8.5 6.707V10.5a.5.5 0 0 1-1 0V6.707L6.354 7.854a.5.5 0 1 1-.708-.708l2-2z"/>
+                                            <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
+                                        </svg>
+                                    </div>
+                                    <p class="mb-1 fw-bold">Drag and drop your video here</p>
+                                    <p class="text-muted small mb-0">or click to browse</p>
+                                    <input type="file" id="videoInput" accept="video/*" class="d-none">
+                                </div>
+                                <small class="text-muted d-block" id="fileInfo"></small>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="objectInput" class="form-label fw-bold">Object to Find</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+                                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                                        </svg>
+                                    </span>
+                                    <input type="text" class="form-control" id="objectInput" placeholder="e.g., 'a person wearing red shirt', 'a car', 'a dog'">
+                                </div>
+                            </div>
+
+                            <div class="alert alert-danger d-none" id="errorAlert"></div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-2" id="analyzeBtn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-camera-video me-2" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M0 5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.983 1.738l3.11-1.382A1 1 0 0 1 16 4.269v7.462a1 1 0 0 1-1.406.913l-3.111-1.382A2 2 0 0 1 9.5 13H2a2 2 0 0 1-2-2V5zm11.5 5.175 3.5 1.556V4.269l-3.5 1.556v4.35zM2 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h7.5a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H2z"/>
+                                </svg>
+                                Start Analysis
+                            </button>
+                        </form>
+
+                        <!-- Loading Animation -->
+                        <div id="statusText" class="text-center mt-4 mb-4 d-none">
+                            <div class="spinner-grow text-primary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="spinner-grow text-secondary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="spinner-grow text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Analyzing video with AI...</p>
+                            <div class="progress mt-2" style="height: 4px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Summary -->
+                        <div id="analysisSummary" class="card mb-4 mt-4 d-none">
+                            <div class="card-body">
+                                <h5 class="card-title">Analysis Summary</h5>
+                                <div class="row text-center">
+                                    <div class="col-4">
+                                        <div class="p-3">
+                                            <h3 id="totalFrames">0</h3>
+                                            <p class="text-muted mb-0">Frames Analyzed</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="p-3">
+                                            <h3 id="matchesFound">0</h3>
+                                            <p class="text-muted mb-0">Matches</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="p-3">
+                                            <h3 id="avgConfidence">0</h3>
+                                            <p class="text-muted mb-0">Avg. Confidence</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="results-container mt-4" id="resultsContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>AI Video Scanner</h5>
+                    <p class="text">Powered by Llama 3.2 Vision 11b</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">© 2025 Video Analysis Tool</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('uploadArea');
+            const videoInput = document.getElementById('videoInput');
+            const uploadForm = document.getElementById('uploadForm');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const statusText = document.getElementById('statusText');
+            const errorAlert = document.getElementById('errorAlert');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const fileInfo = document.getElementById('fileInfo');
+            const analysisSummary = document.getElementById('analysisSummary');
+
+            // Stats tracking
+            let stats = {
+                totalFrames: 0,
+                matchesFound: 0,
+                confidenceSum: 0
+            };
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = 'var(--primary)';
+            });
+
+            uploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = 'var(--gray-300)';
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = 'var(--gray-300)';
+                const files = e.dataTransfer.files;
+                if (files.length) {
+                    videoInput.files = files;
+                    updateFileInfo(files[0]);
+                }
+            });
+
+            uploadArea.addEventListener('click', () => {
+                videoInput.click();
+            });
+
+            videoInput.addEventListener('change', (e) => {
+                if (e.target.files.length) {
+                    updateFileInfo(e.target.files[0]);
+                }
+            });
+
+            function updateFileInfo(file) {
+                const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                fileInfo.innerHTML = `<strong>Selected file:</strong> ${file.name} <span class="badge bg-secondary ms-2">${fileSizeMB} MB</span>`;
+            }
+
+            function showError(message) {
+                errorAlert.textContent = message;
+                errorAlert.classList.remove('d-none');
+            }
+
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            function getConfidenceColor(confidence) {
+                if (confidence >= 8) return 'success';
+                if (confidence >= 5) return 'warning';
+                return 'danger';
+            }
+
+            function updateStats(frame) {
+                stats.totalFrames++;
+                if (frame.is_match) stats.matchesFound++;
+                stats.confidenceSum += frame.confidence;
+                
+                document.getElementById('totalFrames').textContent = stats.totalFrames;
+                document.getElementById('matchesFound').textContent = stats.matchesFound;
+                document.getElementById('avgConfidence').textContent = 
+                    (stats.confidenceSum / stats.totalFrames).toFixed(1);
+                
+                analysisSummary.classList.remove('d-none');
+            }
+
+            function displayFrame(frame) {
+                const frameCard = document.createElement('div');
+                frameCard.className = 'card mb-4 frame-card';
+                frameCard.style.animationDelay = `${frame.second * 0.1}s`;
+                
+                const matchBadgeClass = frame.is_match ? 'bg-success' : 'bg-secondary';
+                const matchText = frame.is_match ? 'Found' : 'Not Found';
+                
+                frameCard.innerHTML = `
+                    <div class="card-header bg-transparent">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">Time: ${formatTime(frame.second)}</h5>
+                            <span class="badge ${matchBadgeClass} match-badge">${matchText}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="position-relative mb-3">
+                            <img src="${frame.frame_path}" alt="Frame ${frame.second}" class="frame-image w-100">
+                        </div>
+                        <div class="description-box p-3 bg-light rounded mb-3">
+                            <p class="card-text mb-1">${frame.description || 'No description available'}</p>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <div class="confidence-meter w-100">
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-${getConfidenceColor(frame.confidence)}" 
+                                         role="progressbar" 
+                                         style="width: ${frame.confidence * 10}%"></div>
+                                </div>
+                                <small class="text-muted">Confidence: ${frame.confidence}/10</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                resultsContainer.insertBefore(frameCard, resultsContainer.firstChild);
+                updateStats(frame);
+            }
+
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const video = videoInput.files[0];
+                const objectStr = document.getElementById('objectInput').value;
+
+                if (!video || !objectStr) {
+                    showError('Please provide both video file and object description');
+                    return;
+                }
+
+                try {
+                    // Reset stats
+                    stats = {
+                        totalFrames: 0,
+                        matchesFound: 0,
+                        confidenceSum: 0
+                    };
+                    
+                    document.getElementById('totalFrames').textContent = '0';
+                    document.getElementById('matchesFound').textContent = '0';
+                    document.getElementById('avgConfidence').textContent = '0';
+                    
+                    errorAlert.classList.add('d-none');
+                    statusText.classList.remove('d-none');
+                    analyzeBtn.disabled = true;
+                    resultsContainer.innerHTML = '';
+                    analysisSummary.classList.add('d-none');
+
+                    const formData = new FormData();
+                    formData.append('video', video);
+                    formData.append('object_str', objectStr);
+
+                    const response = await fetch('/analyze', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+
+                    while (true) {
+                        const {value, done} = await reader.read();
+                        if (done) break;
+
+                        const text = decoder.decode(value);
+                        const results = text.split('\n').filter(line => line.trim());
+
+                        for (const result of results) {
+                            try {
+                                const data = JSON.parse(result);
+                                if (data.status === 'success' && data.frame) {
+                                    displayFrame(data.frame);
+                                }
+                            } catch (e) {
+                                console.error('Error parsing result:', e);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    showError('An error occurred during analysis');
+                    console.error('Error:', error);
+                } finally {
+                    statusText.classList.add('d-none');
+                    analyzeBtn.disabled = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
