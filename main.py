@@ -154,6 +154,4 @@ async def analyze_video(
 
 if __name__ == "__main__":
     import uvicorn
-    import numpy as np
-
     uvicorn.run(app, host="0.0.0.0", port=8000)
